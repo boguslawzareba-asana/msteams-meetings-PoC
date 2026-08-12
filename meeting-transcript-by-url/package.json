@@ -1,0 +1,21 @@
+{
+  "name": "teams-meeting-transcript-poc",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "meeting-transcript-by-url.ts",
+  "scripts": {
+    "start": "node --import tsx --env-file=.env meeting-transcript-by-url.ts",
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.0.0",
+    "@microsoft/teams.graph": "^2.0.0",
+    "@microsoft/teams.graph-endpoints-beta": "^2.0.0",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.3"
+  }
+}
