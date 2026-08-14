@@ -59,17 +59,40 @@ interface MeetingLookupResult {
   userId: string;
 }
 
+function normalizeJoinUrl(raw: string): string {
+  return raw.trim().replace(/\\/g, '');
+}
+
 function joinUrlVariants(raw: string): string[] {
-  const url = new URL(raw);
+  const normalized = normalizeJoinUrl(raw);
+  const url = new URL(normalized);
   const variants = new Set<string>();
 
-  variants.add(raw.trim());
-  variants.add(url.toString());
-
-  const withoutQuery = `${url.origin}${url.pathname}`;
-  variants.add(withoutQuery);
-
+  const singleEncoded = `${url.origin}${url.pathname}${url.search}`;
   const decodedPath = decodeURIComponent(url.pathname);
+
+  // App-only tokens require double-encoded JoinWebUrl in the filter (Graph docs, Example 3).
+  variants.add(encodeURIComponent(singleEncoded));
+  variants.add(encodeURIComponent(url.href));
+
+  variants.add(normalized);
+  variants.add(url.href);
+  variants.add(singleEncoded);
+
+  // Decoded path + query (delegated-token format in Graph docs).
+  variants.add(`${url.origin}${decodedPath}${url.search}`);
+
+  const context = url.searchParams.get('context');
+  if (context) {
+    variants.add(`${url.origin}${decodedPath}?context=${context}`);
+    try {
+      variants.add(`${url.origin}${decodedPath}?context=${JSON.stringify(JSON.parse(context))}`);
+    } catch {
+      // ignore malformed context JSON
+    }
+  }
+
+  variants.add(`${url.origin}${url.pathname}`);
   variants.add(`${url.origin}${decodedPath}`);
 
   return [...variants];
@@ -81,16 +104,20 @@ function escapeODataString(value: string): string {
 
 async function resolveOnlineMeeting(userId: string, joinUrl: string): Promise<OnlineMeeting | undefined> {
   for (const candidate of joinUrlVariants(joinUrl)) {
-    const filter = `JoinWebUrl eq '${escapeODataString(candidate)}'`;
-    const response = (
-      await graphClient.http.get(`/users/${userId}/onlineMeetings`, {
-        params: { $filter: filter },
-      })
-    ).data as GraphListResponse<OnlineMeeting>;
+    try {
+      const filter = `JoinWebUrl eq '${escapeODataString(candidate)}'`;
+      const response = (
+        await graphClient.http.get(`/users/${userId}/onlineMeetings`, {
+          params: { $filter: filter },
+        })
+      ).data as GraphListResponse<OnlineMeeting>;
 
-    const meeting = response.value?.[0];
-    if (meeting?.id) {
-      return meeting;
+      const meeting = response.value?.[0];
+      if (meeting?.id) {
+        return meeting;
+      }
+    } catch {
+      // Try the next URL encoding variant (e.g. app-only needs double-encoded JoinWebUrl).
     }
   }
 
@@ -148,12 +175,35 @@ async function getMeetingTranscript(meetingResourceId: string, userId: string): 
 
     return content ?? '';
   } catch (error) {
-    console.error('Error retrieving transcript:', error);
+    console.error('Error retrieving transcript:', formatGraphApiError(error));
     return '';
   }
 }
 
 // --- main ---
+
+function formatGraphApiError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const response = (error as { response?: { status?: number; data?: unknown } }).response;
+    if (response) {
+      const status = response.status ?? 'unknown';
+      const body =
+        response.data === undefined
+          ? ''
+          : typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data, null, 2);
+      const message = error instanceof Error ? error.message : 'Graph API request failed';
+      return body ? `${message} (${status})\n${body}` : `${message} (${status})`;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
 
 function usage(): never {
   console.error('Usage: npm start -- <teams-meeting-url>');
@@ -187,6 +237,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(formatGraphApiError(error));
   process.exit(1);
 });

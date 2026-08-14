@@ -49,10 +49,19 @@ New-CsApplicationAccessPolicy `
   -AppIds "<CLIENT_ID>" `
   -Description "Allow the transcript sample to access organizers' meetings"
 
+# Grant globally
 Grant-CsApplicationAccessPolicy `
   -PolicyName <policy name defined above> `
   -Global
+
+# if it does not work, try granting to specific user:
+Grant-CsApplicationAccessPolicy `
+  -PolicyName <policy name defined above> `
+  -Identity <meeting-organizer-object-id>
 ```
+
+To find the organizer object id, go to https://entra.microsoft.com/ -> Users -> find your user -> copy Object ID
+The user id must be the user that you will use to create meetings.
 
 Policy changes can take up to 30 minutes to affect Microsoft Graph calls. See [Configure application access to online meetings](https://learn.microsoft.com/graph/cloud-communication-online-meeting-application-access-policy).
 
@@ -75,8 +84,6 @@ CLIENT_SECRET=<secret value from point 1.4>
 TARGET_USER_ID=<meeting-organizer-object-id>
 ```
 
-To find the organizer object id, go to https://entra.microsoft.com/ -> Users -> find your user -> copy Object ID
-The user id must be the user that you will use to create meetings.
 
 ## 5. Run the sample
 
@@ -89,7 +96,7 @@ npm start -- "<copied url>"
 
 ```bash
 e.g. ```
-npm start -- https://teams.microsoft.com/l/meetup-join/19%3ameeting_NmZhOGUwZDctZGMzNC00OTg1LTg5NjctMTZkM2Y1YmYxZGM0%40thread.v2/0\?context\=%7b%22Tid%22%3a%22853dd5d3-bae1-4355-ae45-d6b0add10afa%22%2c%22Oid%22%3a%22881d0d67-82a0-4927-b2a3-1730357326b5%22%7d
+npm start -- "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NmZhOGUwZDctZGMzNC00OTg1LTg5NjctMTZkM2Y1YmYxZGM0%40thread.v2/0?context=%7b%22Tid%22%3a%22853dd5d3-bae1-4355-ae45-d6b0add10afa%22%2c%22Oid%22%3a%22881d0d67-82a0-4927-b2a3-1730357326b5%22%7d"
 ```
 
 
