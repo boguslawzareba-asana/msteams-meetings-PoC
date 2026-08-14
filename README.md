@@ -81,24 +81,23 @@ Fill in `.env`:
 TENANT_ID=853dd5d3-bae1-4355-ae45-d6b0add10afa
 CLIENT_ID=<Application (client) ID from point 1.3>
 CLIENT_SECRET=<secret value from point 1.4>
-TARGET_USER_ID=<meeting-organizer-object-id>
 ```
 
 
 ## 5. Run the sample
 
 Create a meeting in Outlook, make it a Teams meeting. Copy the join link from meeting description.
+Join via link, say some word and ensure they were transcribed. Leave the meeting.
 
 ```bash
 npm install
-npm start -- "<copied url>"
+npm start -- <meeting-organizer-object-id> "<copied url>"
 ```
 
 ```bash
 e.g. ```
-npm start -- "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NmZhOGUwZDctZGMzNC00OTg1LTg5NjctMTZkM2Y1YmYxZGM0%40thread.v2/0?context=%7b%22Tid%22%3a%22853dd5d3-bae1-4355-ae45-d6b0add10afa%22%2c%22Oid%22%3a%22881d0d67-82a0-4927-b2a3-1730357326b5%22%7d"
+npm start -- 881d0d67-82a0-4927-b2a3-1730357326b5 "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NmZhOGUwZDctZGMzNC00OTg1LTg5NjctMTZkM2Y1YmYxZGM0%40thread.v2/0?context=%7b%22Tid%22%3a%22853dd5d3-bae1-4355-ae45-d6b0add10afa%22%2c%22Oid%22%3a%22881d0d67-82a0-4927-b2a3-1730357326b5%22%7d"
 ```
-
 
 If the command prints `(no transcript available)`, confirm that the meeting has ended or its transcript has been generated, and that transcription was enabled. For `Forbidden` errors, verify admin consent and the organizer's application access policy; allow up to 30 minutes after changing the policy.
 

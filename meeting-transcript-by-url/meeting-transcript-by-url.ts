@@ -4,11 +4,10 @@
 // PoC: resolve a Teams meeting join URL and fetch its transcript via Microsoft Graph.
 //
 // Run:
-//   npm start -- "<teams-meeting-url>"
+//   npm start -- <userId> "<teams-meeting-url>"
 //
 // Environment (.env):
 //   TENANT_ID, CLIENT_ID, CLIENT_SECRET  - app registration credentials
-//   TARGET_USER_ID or MEETING_ORGANIZER_USER_ID - fallback organizer id when not in URL context
 //
 // App permissions (admin consent):
 //   OnlineMeetings.Read.All, OnlineMeetingTranscript.Read.All
@@ -124,8 +123,7 @@ async function resolveOnlineMeeting(userId: string, joinUrl: string): Promise<On
   return undefined;
 }
 
-async function getMeetingIdByUrl(joinUrl: string): Promise<MeetingLookupResult> {
-  const userId = process.env.TARGET_USER_ID;
+async function getMeetingIdByUrl(userId: string, joinUrl: string): Promise<MeetingLookupResult> {
   const meeting = await resolveOnlineMeeting(userId, joinUrl);
 
   if (!meeting?.id) {
@@ -206,7 +204,7 @@ function formatGraphApiError(error: unknown): string {
 }
 
 function usage(): never {
-  console.error('Usage: npm start -- <teams-meeting-url>');
+  console.error('Usage: npm start -- <userId> <teams-meeting-url>');
   process.exit(1);
 }
 
@@ -216,7 +214,6 @@ function validateEnv(): void {
   if (!process.env.TENANT_ID?.trim()) missing.push('TENANT_ID');
   if (!process.env.CLIENT_ID?.trim()) missing.push('CLIENT_ID');
   if (!process.env.CLIENT_SECRET?.trim()) missing.push('CLIENT_SECRET');
-  if (!process.env.TARGET_USER_ID?.trim()) missing.push('TARGET_USER_ID');
 
   if (missing.length > 0) {
     console.error(`Missing required environment variable(s): ${missing.join(', ')}`);
@@ -226,12 +223,13 @@ function validateEnv(): void {
 
 async function main(): Promise<void> {
   validateEnv();
-  const joinUrl = process.argv[2];
-  if (!joinUrl || joinUrl.startsWith('-')) {
+  const userId = process.argv[2];
+  const joinUrl = process.argv[3];
+  if (!userId || userId.startsWith('-') || !joinUrl || joinUrl.startsWith('-')) {
     usage();
   }
 
-  const { meetingId, userId } = await getMeetingIdByUrl(joinUrl.trim());
+  const { meetingId } = await getMeetingIdByUrl(userId.trim(), joinUrl.trim());
   const transcript = await getMeetingTranscript(meetingId, userId);
   console.log(transcript || '(no transcript available)');
 }
