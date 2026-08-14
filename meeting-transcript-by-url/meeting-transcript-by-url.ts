@@ -59,44 +59,6 @@ interface MeetingLookupResult {
   userId: string;
 }
 
-function parseMeetingUrl(input: string): ParsedMeetingUrl {
-  let url: URL;
-  try {
-    url = new URL(input.trim());
-  } catch {
-    throw new Error('Invalid URL');
-  }
-
-  if (!url.hostname.includes('teams.microsoft.com')) {
-    throw new Error('URL must be a teams.microsoft.com meeting join link');
-  }
-
-  const pathMatch = url.pathname.match(/\/l\/meetup-join\/([^/]+)\/\d+/);
-  if (!pathMatch) {
-    throw new Error('Could not parse meeting thread id from URL path');
-  }
-
-  let organizerUserId: string | undefined;
-  let tenantId: string | undefined;
-  const contextParam = url.searchParams.get('context');
-  if (contextParam) {
-    try {
-      const context = JSON.parse(decodeURIComponent(contextParam)) as { Tid?: string; Oid?: string };
-      organizerUserId = context.Oid;
-      tenantId = context.Tid;
-    } catch {
-      throw new Error('Could not parse context query parameter from URL');
-    }
-  }
-
-  return {
-    joinUrl: input.trim(),
-    threadId: decodeURIComponent(pathMatch[1]),
-    organizerUserId,
-    tenantId,
-  };
-}
-
 function joinUrlVariants(raw: string): string[] {
   const url = new URL(raw);
   const variants = new Set<string>();
@@ -115,21 +77,6 @@ function joinUrlVariants(raw: string): string[] {
 
 function escapeODataString(value: string): string {
   return value.replace(/'/g, "''");
-}
-
-function resolveOrganizerUserId(parsed: ParsedMeetingUrl): string {
-  const userId =
-    parsed.organizerUserId ??
-    process.env.TARGET_USER_ID ??
-    process.env.MEETING_ORGANIZER_USER_ID;
-
-  if (!userId) {
-    throw new Error(
-      'Organizer user id not found in URL context; set TARGET_USER_ID or MEETING_ORGANIZER_USER_ID in .env'
-    );
-  }
-
-  return userId;
 }
 
 async function resolveOnlineMeeting(userId: string, joinUrl: string): Promise<OnlineMeeting | undefined> {
@@ -151,13 +98,12 @@ async function resolveOnlineMeeting(userId: string, joinUrl: string): Promise<On
 }
 
 async function getMeetingIdByUrl(joinUrl: string): Promise<MeetingLookupResult> {
-  const parsed = parseMeetingUrl(joinUrl);
-  const userId = resolveOrganizerUserId(parsed);
-  const meeting = await resolveOnlineMeeting(userId, parsed.joinUrl);
+  const userId = process.env.TARGET_USER_ID;
+  const meeting = await resolveOnlineMeeting(userId, joinUrl);
 
   if (!meeting?.id) {
     throw new Error(
-      `No online meeting found for join URL (organizer: ${userId}, thread: ${parsed.threadId})`
+      `No online meeting found for join URL (organizer: ${userId})`
     );
   }
 
@@ -214,13 +160,28 @@ function usage(): never {
   process.exit(1);
 }
 
+function validateEnv(): void {
+  const missing: string[] = [];
+
+  if (!process.env.TENANT_ID?.trim()) missing.push('TENANT_ID');
+  if (!process.env.CLIENT_ID?.trim()) missing.push('CLIENT_ID');
+  if (!process.env.CLIENT_SECRET?.trim()) missing.push('CLIENT_SECRET');
+  if (!process.env.TARGET_USER_ID?.trim()) missing.push('TARGET_USER_ID');
+
+  if (missing.length > 0) {
+    console.error(`Missing required environment variable(s): ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  validateEnv();
   const joinUrl = process.argv[2];
   if (!joinUrl || joinUrl.startsWith('-')) {
     usage();
   }
 
-  const { meetingId, userId } = await getMeetingIdByUrl(joinUrl);
+  const { meetingId, userId } = await getMeetingIdByUrl(joinUrl.trim());
   const transcript = await getMeetingTranscript(meetingId, userId);
   console.log(transcript || '(no transcript available)');
 }
