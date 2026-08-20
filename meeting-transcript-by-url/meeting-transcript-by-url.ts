@@ -111,6 +111,9 @@ async function resolveOnlineMeeting(userId: string, joinUrl: string): Promise<On
         })
       ).data as GraphListResponse<OnlineMeeting>;
 
+      console.log("meeting - Graph API response: ");
+      console.log(response);
+
       const meeting = response.value?.[0];
       if (meeting?.id) {
         return meeting;
@@ -137,7 +140,17 @@ async function getMeetingIdByUrl(userId: string, joinUrl: string): Promise<Meeti
 
 // --- getMeetingTranscript ---
 
-async function getMeetingTranscript(meetingResourceId: string, userId: string): Promise<string> {
+interface MeetingTranscriptResult {
+  id: string;
+  content: string;
+}
+
+const emptyTranscript: MeetingTranscriptResult = { id: '', content: '' };
+
+async function getMeetingTranscript(
+  meetingResourceId: string,
+  userId: string
+): Promise<MeetingTranscriptResult> {
   try {
     const transcriptsResponse = await graphClient.call(
       betaEndpoints.users.onlineMeetings.transcripts.list,
@@ -148,7 +161,7 @@ async function getMeetingTranscript(meetingResourceId: string, userId: string): 
     );
 
     if (!transcriptsResponse.value?.length) {
-      return '';
+      return emptyTranscript;
     }
 
     const latestTranscript = transcriptsResponse.value.reduce((latest, current) => {
@@ -158,7 +171,7 @@ async function getMeetingTranscript(meetingResourceId: string, userId: string): 
     }, transcriptsResponse.value[0]);
 
     if (!latestTranscript.id) {
-      return '';
+      return emptyTranscript;
     }
 
     const content = await graphClient.call(
@@ -171,10 +184,10 @@ async function getMeetingTranscript(meetingResourceId: string, userId: string): 
       { requestConfig: { headers: { Accept: 'text/vtt' } } }
     );
 
-    return content ?? '';
+    return { id: latestTranscript.id, content: content ?? '' };
   } catch (error) {
     console.error('Error retrieving transcript:', formatGraphApiError(error));
-    return '';
+    return emptyTranscript;
   }
 }
 
@@ -231,7 +244,8 @@ async function main(): Promise<void> {
 
   const { meetingId } = await getMeetingIdByUrl(userId.trim(), joinUrl.trim());
   const transcript = await getMeetingTranscript(meetingId, userId);
-  console.log(transcript || '(no transcript available)');
+  console.log(`transcript id: ${transcript.id}`);
+  console.log(transcript.content || '(no transcript available)');
 }
 
 main().catch((error) => {
